@@ -50,9 +50,9 @@ export default function MusicPlayer() {
         <Music className="w-5 h-5" />
       </button>
       {/* Users can add their own audio src here */}
-      <audio ref={audioRef} loop preload="none">
-        {/* Add your audio source: <source src="/your-song.mp3" type="audio/mpeg" /> */}
-      </audio>
+      <audio ref={audioRef} src="/music.mp3" loop preload="auto" />
     </div>
   );
 }
+
+
