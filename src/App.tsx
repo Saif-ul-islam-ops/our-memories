@@ -17,7 +17,7 @@ const App = () => (
       <Toaster />
       <Sonner />
 
-      <BrowserRouter>
+      <BrowserRouter basename="/our-memories">
         <AuthGate>
           <Routes>
             <Route path="/" element={<Index />} />
