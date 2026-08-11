@@ -12,6 +12,7 @@ import {
   serverTimestamp,
   Timestamp,
   onSnapshot,
+  getDocs,
 } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -28,32 +29,91 @@ const db = getFirestore(app);
 
 export const auth = getAuth(app);
 
-// Cloudinary
+// ======================================================
+// CLOUDINARY
+// ======================================================
+
 const CLOUD_NAME = "dxsjvb6ou";
 const UPLOAD_PRESET = "romantic-upload";
 
+// ======================================================
+// GALLERY - IMAGE UPLOAD
+// ======================================================
+
 export async function uploadToCloudinary(file: File): Promise<string> {
   const formData = new FormData();
+
   formData.append("file", file);
   formData.append("upload_preset", UPLOAD_PRESET);
 
   const res = await fetch(
     `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
-    { method: "POST", body: formData }
+    {
+      method: "POST",
+      body: formData,
+    }
   );
 
   const data = await res.json();
 
   if (!res.ok) {
-    console.error("Cloudinary error:", data);
-    throw new Error(data.error?.message || "Upload failed");
+    console.error("Cloudinary image error:", data);
+    throw new Error(data.error?.message || "Image upload failed");
   }
 
   return data.secure_url;
 }
 
-// Gallery
-export async function saveImageToFirestore(section: string, imageUrl: string) {
+// ======================================================
+// MUSIC - AUDIO UPLOAD
+// ======================================================
+
+export async function uploadMusicToCloudinary(
+  file: File
+): Promise<{
+  url: string;
+  publicId: string;
+  duration?: number;
+}> {
+  if (!file.type.startsWith("audio/")) {
+    throw new Error("Please select an audio file.");
+  }
+
+  const formData = new FormData();
+
+  formData.append("file", file);
+  formData.append("upload_preset", UPLOAD_PRESET);
+
+  const res = await fetch(
+    `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/video/upload`,
+    {
+      method: "POST",
+      body: formData,
+    }
+  );
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    console.error("Cloudinary music error:", data);
+    throw new Error(data.error?.message || "Music upload failed");
+  }
+
+  return {
+    url: data.secure_url,
+    publicId: data.public_id,
+    duration: data.duration,
+  };
+}
+
+// ======================================================
+// GALLERY
+// ======================================================
+
+export async function saveImageToFirestore(
+  section: string,
+  imageUrl: string
+) {
   return addDoc(collection(db, "gallery"), {
     section,
     imageUrl,
@@ -61,10 +121,16 @@ export async function saveImageToFirestore(section: string, imageUrl: string) {
   });
 }
 
-// ✅ Real-time listener (NEW)
+// Real-time Gallery listener
 export function subscribeToGallery(
   section: string,
-  callback: (data: Array<{ id: string; section: string; imageUrl: string }>) => void
+  callback: (
+    data: Array<{
+      id: string;
+      section: string;
+      imageUrl: string;
+    }>
+  ) => void
 ) {
   const q = query(
     collection(db, "gallery"),
@@ -77,19 +143,30 @@ export function subscribeToGallery(
       id: d.id,
       ...(d.data() as any),
     }));
+
     callback(data);
   });
 }
 
-// Fallback fetch (still useful)
+// Fallback gallery fetch
 export async function fetchGalleryImages(section?: string) {
   const q = section
-    ? query(collection(db, "gallery"), where("section", "==", section), orderBy("createdAt", "desc"))
-    : query(collection(db, "gallery"), orderBy("createdAt", "desc"));
+    ? query(
+      collection(db, "gallery"),
+      where("section", "==", section),
+      orderBy("createdAt", "desc")
+    )
+    : query(
+      collection(db, "gallery"),
+      orderBy("createdAt", "desc")
+    );
 
-  const snap = await (await import("firebase/firestore")).getDocs(q);
+  const snap = await getDocs(q);
 
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() })) as Array<{
+  return snap.docs.map((d) => ({
+    id: d.id,
+    ...d.data(),
+  })) as Array<{
     id: string;
     section: string;
     imageUrl: string;
@@ -101,7 +178,10 @@ export async function deleteGalleryImage(id: string) {
   return deleteDoc(doc(db, "gallery", id));
 }
 
-// Notes
+// ======================================================
+// NOTES
+// ======================================================
+
 export async function addNote(text: string) {
   return addDoc(collection(db, "notes"), {
     text,
@@ -110,10 +190,17 @@ export async function addNote(text: string) {
 }
 
 export async function fetchNotes() {
-  const q = query(collection(db, "notes"), orderBy("createdAt", "desc"));
-  const snap = await (await import("firebase/firestore")).getDocs(q);
+  const q = query(
+    collection(db, "notes"),
+    orderBy("createdAt", "desc")
+  );
 
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() })) as Array<{
+  const snap = await getDocs(q);
+
+  return snap.docs.map((d) => ({
+    id: d.id,
+    ...d.data(),
+  })) as Array<{
     id: string;
     text: string;
     createdAt: Timestamp;
@@ -124,7 +211,10 @@ export async function deleteNote(id: string) {
   return deleteDoc(doc(db, "notes", id));
 }
 
-// Timeline
+// ======================================================
+// TIMELINE
+// ======================================================
+
 export async function addTimelineEvent(
   title: string,
   description: string,
@@ -139,10 +229,17 @@ export async function addTimelineEvent(
 }
 
 export async function fetchTimeline() {
-  const q = query(collection(db, "timeline"), orderBy("date", "asc"));
-  const snap = await (await import("firebase/firestore")).getDocs(q);
+  const q = query(
+    collection(db, "timeline"),
+    orderBy("date", "asc")
+  );
 
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() })) as Array<{
+  const snap = await getDocs(q);
+
+  return snap.docs.map((d) => ({
+    id: d.id,
+    ...d.data(),
+  })) as Array<{
     id: string;
     title: string;
     description: string;
@@ -153,4 +250,82 @@ export async function fetchTimeline() {
 
 export async function deleteTimelineEvent(id: string) {
   return deleteDoc(doc(db, "timeline", id));
+}
+
+// ======================================================
+// MUSIC DATABASE
+// ======================================================
+
+export interface MusicTrack {
+  id: string;
+  title: string;
+  url: string;
+  publicId: string;
+  addedBy: string;
+  addedByEmail: string;
+  createdAt?: Timestamp;
+  duration?: number;
+}
+
+// Add music record
+export async function saveMusicToFirestore(
+  title: string,
+  url: string,
+  publicId: string,
+  duration?: number
+) {
+  const user = auth.currentUser;
+
+  if (!user) {
+    throw new Error("You must be logged in to add music.");
+  }
+
+  const addedBy =
+    user.displayName ||
+    user.email?.split("@")[0] ||
+    "Unknown";
+
+  return addDoc(collection(db, "music"), {
+    title,
+    url,
+    publicId,
+    duration: duration || null,
+
+    addedBy,
+    addedByEmail: user.email || "",
+
+    uid: user.uid,
+
+    createdAt: serverTimestamp(),
+  });
+}
+
+// Real-time music library
+export function subscribeToMusic(
+  callback: (tracks: MusicTrack[]) => void
+) {
+  const q = query(
+    collection(db, "music"),
+    orderBy("createdAt", "asc")
+  );
+
+  return onSnapshot(q, (snapshot) => {
+    const tracks = snapshot.docs.map((d) => ({
+      id: d.id,
+      ...(d.data() as Omit<MusicTrack, "id">),
+    }));
+
+    callback(tracks);
+  });
+}
+
+// Delete music
+export async function deleteMusic(id: string) {
+  const user = auth.currentUser;
+
+  if (!user) {
+    throw new Error("You must be logged in to delete music.");
+  }
+
+  return deleteDoc(doc(db, "music", id));
 }
