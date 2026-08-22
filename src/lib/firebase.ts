@@ -182,14 +182,35 @@ export async function deleteGalleryImage(id: string) {
 // NOTES
 // ======================================================
 
+export interface TextNote {
+  id: string;
+  type: "text";
+  text: string;
+  createdAt: Timestamp;
+}
+
+export interface VoiceNote {
+  id: string;
+  type: "voice";
+  audioUrl: string;
+  publicId: string;
+  duration?: number;
+  createdAt: Timestamp;
+}
+
+export type LoveNote = TextNote | VoiceNote;
+
+// Add text note
 export async function addNote(text: string) {
   return addDoc(collection(db, "notes"), {
+    type: "text",
     text,
     createdAt: serverTimestamp(),
   });
 }
 
-export async function fetchNotes() {
+// Fetch all notes
+export async function fetchNotes(): Promise<LoveNote[]> {
   const q = query(
     collection(db, "notes"),
     orderBy("createdAt", "desc")
@@ -197,18 +218,90 @@ export async function fetchNotes() {
 
   const snap = await getDocs(q);
 
-  return snap.docs.map((d) => ({
-    id: d.id,
-    ...d.data(),
-  })) as Array<{
-    id: string;
-    text: string;
-    createdAt: Timestamp;
-  }>;
+  return snap.docs.map((d) => {
+    const data = d.data();
+
+    // Backwards compatibility:
+    // Old notes don't have a "type" field.
+    if (!data.type) {
+      return {
+        id: d.id,
+        type: "text",
+        text: data.text || "",
+        createdAt: data.createdAt,
+      } as TextNote;
+    }
+
+    return {
+      id: d.id,
+      ...data,
+    } as LoveNote;
+  });
 }
 
+// Delete note
 export async function deleteNote(id: string) {
   return deleteDoc(doc(db, "notes", id));
+}
+
+// ======================================================
+// VOICE NOTES
+// ======================================================
+
+export async function uploadVoiceNoteToCloudinary(
+  file: File
+): Promise<{
+  url: string;
+  publicId: string;
+  duration?: number;
+}> {
+  if (!file.type.startsWith("audio/")) {
+    throw new Error("The recorded file is not a valid audio file.");
+  }
+
+  const formData = new FormData();
+
+  formData.append("file", file);
+  formData.append("upload_preset", UPLOAD_PRESET);
+
+  const res = await fetch(
+    `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/video/upload`,
+    {
+      method: "POST",
+      body: formData,
+    }
+  );
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    console.error("Cloudinary voice note error:", data);
+
+    throw new Error(
+      data.error?.message || "Voice note upload failed."
+    );
+  }
+
+  return {
+    url: data.secure_url,
+    publicId: data.public_id,
+    duration: data.duration,
+  };
+}
+
+// Save voice note metadata
+export async function addVoiceNote(
+  audioUrl: string,
+  publicId: string,
+  duration?: number
+) {
+  return addDoc(collection(db, "notes"), {
+    type: "voice",
+    audioUrl,
+    publicId,
+    duration: duration || null,
+    createdAt: serverTimestamp(),
+  });
 }
 
 // ======================================================

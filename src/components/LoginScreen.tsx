@@ -68,9 +68,9 @@ export default function LoginScreen() {
           Welcome Back
         </h2>
 
-        <p className="text-sm text-muted-foreground mb-6">
+        {/* <p className="text-sm text-muted-foreground mb-6">
           Our little memories are waiting for you ♡
-        </p>
+        </p> */}
 
         {/* Error Message */}
         {error && (
