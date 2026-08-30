@@ -27,7 +27,7 @@ export default function HeroSection() {
             lang="ar"
             className="text-2xl sm:text-3xl md:text-4xl text-romantic-deep font-medium leading-relaxed"
           >
-            اللَّهُمَّ لَا تَفَرَّقْ بَيْنَنَا
+            اللَّهُمَّ لَا تَفَرَّقُ بَيْنَنَا
           </p>
 
           <p className="mt-3 text-sm sm:text-base text-romantic-deep/60 italic font-light">
